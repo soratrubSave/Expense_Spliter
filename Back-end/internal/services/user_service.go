@@ -109,3 +109,38 @@ func (s *UserService) GetUsersByIDs(ids []int) ([]models.User, error) {
 
 	return users, nil
 }
+
+func (s *UserService) SearchUsers(query string, currentUserID int, excludeGroupID int) ([]models.User, error) {
+	if query == "" {
+		return []models.User{}, nil
+	}
+
+	// Search by email or name, exclude current user and users already in the group
+	searchQuery := `
+		SELECT DISTINCT u.id, u.email, u.name, u.created_at
+		FROM users u
+		WHERE (u.email ILIKE $1 OR u.name ILIKE $1)
+		AND u.id != $2
+		AND u.id NOT IN (
+			SELECT user_id FROM group_members WHERE group_id = $3
+		)
+		LIMIT 10
+	`
+
+	rows, err := s.db.Query(searchQuery, "%"+query+"%", currentUserID, excludeGroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []models.User{}
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}

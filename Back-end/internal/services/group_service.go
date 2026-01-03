@@ -168,3 +168,64 @@ func (s *GroupService) IsUserMember(groupID, userID int) (bool, error) {
 	err := s.db.QueryRow(query, groupID, userID).Scan(&exists)
 	return exists, err
 }
+
+func (s *GroupService) UpdateGroup(groupID int, name, description string, userID int) (*models.Group, error) {
+	// Check if user is the creator/owner
+	isOwner, err := s.IsUserOwner(groupID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner {
+		return nil, fmt.Errorf("only group owner can update the group")
+	}
+
+	query := `
+		UPDATE groups
+		SET name = $1, description = $2
+		WHERE id = $3
+		RETURNING id, name, description, created_by, created_at
+	`
+
+	group := &models.Group{}
+	err = s.db.QueryRow(query, name, description, groupID).Scan(
+		&group.ID,
+		&group.Name,
+		&group.Description,
+		&group.CreatedBy,
+		&group.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update group: %v", err)
+	}
+
+	return group, nil
+}
+
+func (s *GroupService) DeleteGroup(groupID, userID int) error {
+	// Check if user is the creator/owner
+	isOwner, err := s.IsUserOwner(groupID, userID)
+	if err != nil {
+		return err
+	}
+	if !isOwner {
+		return fmt.Errorf("only group owner can delete the group")
+	}
+
+	// Delete group (cascade will handle members and expenses)
+	query := `DELETE FROM groups WHERE id = $1`
+	_, err = s.db.Exec(query, groupID)
+	return err
+}
+
+func (s *GroupService) IsUserOwner(groupID, userID int) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM groups
+			WHERE id = $1 AND created_by = $2
+		)
+	`
+
+	var exists bool
+	err := s.db.QueryRow(query, groupID, userID).Scan(&exists)
+	return exists, err
+}

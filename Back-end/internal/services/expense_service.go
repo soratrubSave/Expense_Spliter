@@ -139,6 +139,32 @@ func (s *ExpenseService) GetGroupExpenses(groupID int) ([]models.Expense, error)
 		); err != nil {
 			return nil, err
 		}
+
+		// Get splits for this expense
+		splitsQuery := `
+			SELECT es.id, es.expense_id, es.user_id, u.name, es.amount
+			FROM expense_splits es
+			JOIN users u ON es.user_id = u.id
+			WHERE es.expense_id = $1
+		`
+
+		splitRows, err := s.db.Query(splitsQuery, expense.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		splits := []models.Split{}
+		for splitRows.Next() {
+			var split models.Split
+			if err := splitRows.Scan(&split.ID, &split.ExpenseID, &split.UserID, &split.UserName, &split.Amount); err != nil {
+				splitRows.Close()
+				return nil, err
+			}
+			splits = append(splits, split)
+		}
+		splitRows.Close()
+
+		expense.Splits = splits
 		expenses = append(expenses, expense)
 	}
 

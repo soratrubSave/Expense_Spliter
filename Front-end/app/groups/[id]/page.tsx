@@ -15,6 +15,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -23,7 +34,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { api, type Group, type Expense, type User, type Balance, type Settlement } from "@/lib/api"
 
 import { toast } from "sonner" 
-import { ArrowLeft, Plus, Receipt, TrendingUp, TrendingDown } from "lucide-react"
+import { ArrowLeft, Plus, Receipt, TrendingUp, TrendingDown, Edit, Trash2, MoreVertical, Search } from "lucide-react"
 
 export default function GroupDetailPage() {
   const router = useRouter()
@@ -44,6 +55,23 @@ export default function GroupDetailPage() {
   const [expensePaidBy, setExpensePaidBy] = useState("")
   const [expenseSplitWith, setExpenseSplitWith] = useState<number[]>([])
   const [creating, setCreating] = useState(false)
+
+  const [editGroupDialogOpen, setEditGroupDialogOpen] = useState(false)
+  const [editGroupName, setEditGroupName] = useState("")
+  const [editGroupDescription, setEditGroupDescription] = useState("")
+  const [updatingGroup, setUpdatingGroup] = useState(false)
+
+  const [editExpenseDialogOpen, setEditExpenseDialogOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [editExpenseDescription, setEditExpenseDescription] = useState("")
+  const [editExpenseAmount, setEditExpenseAmount] = useState("")
+  const [editExpensePaidBy, setEditExpensePaidBy] = useState("")
+  const [editExpenseSplitWith, setEditExpenseSplitWith] = useState<number[]>([])
+  const [updatingExpense, setUpdatingExpense] = useState(false)
+
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<User[]>([])
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
@@ -102,6 +130,120 @@ export default function GroupDetailPage() {
     }
   }
 
+  const handleEditGroup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setUpdatingGroup(true)
+
+    try {
+      const updatedGroup = await api.updateGroup(groupId, editGroupName, editGroupDescription)
+      setGroup(updatedGroup)
+      toast.success("Group updated successfully")
+      setEditGroupDialogOpen(false)
+    } catch (error) {
+      toast.error("Failed to update group")
+    } finally {
+      setUpdatingGroup(false)
+    }
+  }
+
+  const handleDeleteGroup = async () => {
+    try {
+      await api.deleteGroup(groupId)
+      toast.success("Group deleted successfully")
+      router.push("/")
+    } catch (error) {
+      toast.error("Failed to delete group")
+    }
+  }
+
+  const openEditGroupDialog = () => {
+    if (group) {
+      setEditGroupName(group.name)
+      setEditGroupDescription(group.description || "")
+      setEditGroupDialogOpen(true)
+    }
+  }
+
+  const openEditExpenseDialog = (expense: Expense) => {
+    setEditingExpense(expense)
+    setEditExpenseDescription(expense.description)
+    setEditExpenseAmount(expense.amount.toString())
+    setEditExpensePaidBy(expense.paid_by.toString())
+    setEditExpenseSplitWith(expense.splits?.map(split => split.user_id) || [])
+    setEditExpenseDialogOpen(true)
+  }
+
+  const handleEditExpense = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingExpense) return
+
+    setUpdatingExpense(true)
+
+    try {
+      await api.updateExpense(
+        editingExpense.id,
+        editExpenseDescription,
+        Number(editExpenseAmount),
+        Number(editExpensePaidBy),
+        editExpenseSplitWith,
+      )
+      
+      toast.success("Expense updated successfully")
+      setEditExpenseDialogOpen(false)
+      setEditingExpense(null)
+      loadGroupData()
+    } catch (error) {
+      toast.error("Failed to update expense")
+    } finally {
+      setUpdatingExpense(false)
+    }
+  }
+
+  const handleDeleteExpense = async (expenseId: number) => {
+    try {
+      await api.deleteExpense(expenseId)
+      toast.success("Expense deleted successfully")
+      loadGroupData()
+    } catch (error) {
+      toast.error("Failed to delete expense")
+    }
+  }
+
+  const handleSearchUsers = async (query: string) => {
+    setSearchQuery(query)
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    setSearching(true)
+    try {
+      const results = await api.searchUsers(groupId, query)
+      setSearchResults(results)
+    } catch (error) {
+      toast.error("Failed to search users")
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleAddMember = async (userId: number, userName: string) => {
+    try {
+      await api.addMemberToGroup(groupId, userId)
+      toast.success(`${userName} added to group successfully`)
+      setSearchQuery("")
+      setSearchResults([])
+      loadGroupData()
+    } catch (error) {
+      toast.error("Failed to add member")
+    }
+  }
+
+  const toggleEditSplitMember = (userId: number) => {
+    setEditExpenseSplitWith((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]))
+  }
+
   const toggleSplitMember = (userId: number) => {
     setExpenseSplitWith((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]))
   }
@@ -134,6 +276,34 @@ export default function GroupDetailPage() {
               <h1 className="text-xl font-semibold">{group?.name}</h1>
               <p className="text-sm text-muted-foreground">{group?.description}</p>
             </div>
+            {group?.created_by === currentUser?.id && (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={openEditGroupDialog}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Group</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete this group? This action cannot be undone and will delete all expenses and data associated with this group.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Delete Group
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
           </div>
         </header>
 
@@ -148,16 +318,95 @@ export default function GroupDetailPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4">
+            <CardContent className="space-y-4">
+              {/* Search Users */}
+              <div className="space-y-2">
+                <Label htmlFor="search-users">Add Members</Label>
+                <Input
+                  id="search-users"
+                  placeholder="Search by email or name..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchUsers(e.target.value)}
+                />
+                {searching && (
+                  <p className="text-sm text-muted-foreground">Searching...</p>
+                )}
+                {searchResults.length > 0 && (
+                  <div className="border rounded-lg p-2 space-y-2 max-h-40 overflow-y-auto">
+                    {searchResults.map((user) => (
+                      <div key={user.id} className="flex items-center justify-between p-2 rounded hover:bg-muted">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">{user.name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{user.name}</p>
+                            <p className="text-xs text-muted-foreground">{user.email}</p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddMember(user.id, user.name)}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Current Members */}
+              <div>
+                <Label className="text-sm font-medium">Current Members</Label>
+                <div className="flex flex-wrap gap-4 mt-2">
                 {group?.members?.map((member) => (
-                  <div key={member.id} className="flex items-center gap-2">
-                    <Avatar>
-                      <AvatarFallback>{member.name[0]}</AvatarFallback>
+                  <div key={member.id} className="flex items-center gap-2 p-2 rounded-lg border">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">{member.name[0]}</AvatarFallback>
                     </Avatar>
                     <span className="text-sm font-medium">{member.name}</span>
+                    {group?.created_by === currentUser?.id && member.id !== currentUser?.id && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive ml-2"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to remove {member.name} from this group?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={async () => {
+                                try {
+                                  await api.removeMemberToGroup(groupId, member.id)
+                                  toast.success("Member removed successfully")
+                                  loadGroupData()
+                                } catch (error) {
+                                  toast.error("Failed to remove member")
+                                }
+                              }}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Remove Member
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 ))}
+              </div>
               </div>
             </CardContent>
           </Card>
@@ -340,11 +589,51 @@ export default function GroupDetailPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="text-lg font-bold">${expense.amount.toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(expense.created_at).toLocaleDateString()}
-                        </p>
+                      <div className="flex items-center gap-2 ml-4">
+                        <div className="text-right">
+                          <p className="text-lg font-bold">${expense.amount.toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(expense.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditExpenseDialog(expense)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this expense? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteExpense(expense.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete Expense
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -352,6 +641,121 @@ export default function GroupDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Edit Group Dialog */}
+          <Dialog open={editGroupDialogOpen} onOpenChange={setEditGroupDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Group</DialogTitle>
+                <DialogDescription>Update group information</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleEditGroup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Group Name</Label>
+                  <Input
+                    id="edit-name"
+                    placeholder="Chiang Mai Trip"
+                    value={editGroupName}
+                    onChange={(e) => setEditGroupName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Description (Optional)</Label>
+                  <Input
+                    id="edit-description"
+                    placeholder="3 days trip"
+                    value={editGroupDescription}
+                    onChange={(e) => setEditGroupDescription(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={updatingGroup}>
+                  {updatingGroup ? "Updating..." : "Update Group"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Expense Dialog */}
+          <Dialog open={editExpenseDialogOpen} onOpenChange={setEditExpenseDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Expense</DialogTitle>
+                <DialogDescription>Update expense information</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleEditExpense} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Input
+                    id="edit-description"
+                    placeholder="Hotel"
+                    value={editExpenseDescription}
+                    onChange={(e) => setEditExpenseDescription(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-amount">Amount</Label>
+                  <Input
+                    id="edit-amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="3000"
+                    value={editExpenseAmount}
+                    onChange={(e) => setEditExpenseAmount(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-paidBy">Paid By</Label>
+                  <Select value={editExpensePaidBy} onValueChange={setEditExpensePaidBy}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {group?.members?.map((member) => (
+                        <SelectItem key={member.id} value={member.id.toString()}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Split With</Label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {group?.members?.map((member) => (
+                      <div key={member.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-member-${member.id}`}
+                          checked={editExpenseSplitWith.includes(member.id)}
+                          onCheckedChange={() => toggleEditSplitMember(member.id)}
+                        />
+                        <label
+                          htmlFor={`edit-member-${member.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {member.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {editExpenseSplitWith.length > 0 && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      Split amount per person: <span className="font-bold text-foreground">
+                        ${(Number(editExpenseAmount) / editExpenseSplitWith.length).toFixed(2)}
+                      </span>
+                    </p>
+                  </div>
+                )}
+                <Button type="submit" className="w-full" disabled={updatingExpense || editExpenseSplitWith.length === 0}>
+                  {updatingExpense ? "Updating..." : "Update Expense"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </AuthGuard>

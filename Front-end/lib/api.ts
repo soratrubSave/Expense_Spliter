@@ -114,6 +114,32 @@ class ApiClient {
     return response.json()
   }
 
+  async updateGroup(id: number, name: string, description?: string): Promise<Group> {
+    const response = await fetch(`${API_BASE_URL}/groups/${id}`, {
+      method: "PUT",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ name, description }),
+    })
+    if (!response.ok) throw new Error("Failed to update group")
+    return response.json()
+  }
+
+  async deleteGroup(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/groups/${id}`, {
+      method: "DELETE",
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to delete group")
+  }
+
+  async searchUsers(groupId: number, query: string): Promise<User[]> {
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/search-users?q=${encodeURIComponent(query)}`, {
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to search users")
+    return response.json()
+  }
+
   async addMemberToGroup(groupId: number, userId: number): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/groups/${groupId}/members`, {
       method: "POST",
@@ -151,6 +177,43 @@ class ApiClient {
     })
     if (!response.ok) throw new Error("Failed to create expense")
     return response.json()
+  }
+
+  async updateExpense(
+    expenseId: number,
+    description: string,
+    amount: number,
+    paidBy: number,
+    splitWith: number[],
+  ): Promise<Expense> {
+    const response = await fetch(`${API_BASE_URL}/expenses/${expenseId}`, {
+      method: "PUT",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        description,
+        amount,
+        paid_by: paidBy,
+        split_with: splitWith,
+      }),
+    })
+    if (!response.ok) throw new Error("Failed to update expense")
+    return response.json()
+  }
+
+  async deleteExpense(expenseId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/expenses/${expenseId}`, {
+      method: "DELETE",
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to delete expense")
+  }
+
+  async removeMemberToGroup(groupId: number, userId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to remove member")
   }
 
   async getSettlements(groupId: number): Promise<SettlementResponse> {

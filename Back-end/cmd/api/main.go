@@ -67,7 +67,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userService)
-	groupHandler := handlers.NewGroupHandler(groupService)
+	groupHandler := handlers.NewGroupHandler(groupService, userService)
 	expenseHandler := handlers.NewExpenseHandler(expenseService)
 
 	// Create Fiber app
@@ -103,6 +103,9 @@ func main() {
 	groups.Post("/", groupHandler.CreateGroup)
 	groups.Get("/", groupHandler.GetUserGroups)
 	groups.Get("/:id", groupHandler.GetGroup)
+	groups.Get("/:id/search-users", groupHandler.SearchUsers)
+	groups.Put("/:id", groupHandler.UpdateGroup)
+	groups.Delete("/:id", groupHandler.DeleteGroup)
 	groups.Post("/:id/members", groupHandler.AddMember)
 	groups.Delete("/:id/members/:userId", groupHandler.RemoveMember)
 
