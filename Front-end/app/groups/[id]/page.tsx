@@ -333,7 +333,7 @@ export default function GroupDetailPage() {
                         <p className="font-medium">{expense.description}</p>
                         <p className="text-sm text-muted-foreground">Paid by {expense.paid_by_name}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {expense.splits.map((split) => (
+                          {expense.splits?.map((split) => (
                             <span key={split.id} className="text-xs px-2 py-1 bg-muted rounded">
                               {split.user_name}: ${split.amount.toFixed(2)}
                             </span>
