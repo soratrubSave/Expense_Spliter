@@ -257,6 +257,34 @@ func (s *ExpenseService) CalculateSettlements(groupID int) ([]models.Settlement,
 		balanceMap[userID] -= amount
 	}
 
+	// Adjust balances for confirmed payments
+	paymentQuery := `
+		SELECT from_user_id, to_user_id, amount
+		FROM payment_confirmations
+		WHERE group_id = $1 AND confirmed_by IS NOT NULL
+	`
+
+	paymentRows, err := s.db.Query(paymentQuery, groupID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer paymentRows.Close()
+
+	for paymentRows.Next() {
+		var fromUserID, toUserID int
+		var amount float64
+
+		if err := paymentRows.Scan(&fromUserID, &toUserID, &amount); err != nil {
+			return nil, nil, err
+		}
+
+		// When payment is confirmed: from_user pays to_user
+		// So from_user's balance decreases (less negative or more positive)
+		// to_user's balance increases (less positive or more negative)
+		balanceMap[fromUserID] += amount // from_user paid, so their debt decreases
+		balanceMap[toUserID] -= amount   // to_user received, so their credit decreases
+	}
+
 	// Convert to balance slice
 	balances := []models.Balance{}
 	for userID, balance := range balanceMap {
@@ -276,6 +304,121 @@ func (s *ExpenseService) CalculateSettlements(groupID int) ([]models.Settlement,
 	settlements := optimizeSettlements(balanceMap, nameMap)
 
 	return settlements, balances, nil
+}
+
+func (s *ExpenseService) CreatePaymentConfirmation(groupID, fromUserID, toUserID int, amount float64, slipURL string) (*models.PaymentConfirmation, error) {
+	query := `
+		INSERT INTO payment_confirmations (group_id, from_user_id, to_user_id, amount, slip_url)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, group_id, from_user_id, to_user_id, amount, slip_url, confirmed_by, confirmed_at
+	`
+
+	var confirmedBy sql.NullInt64
+	var confirmedAt sql.NullTime
+
+	pc := &models.PaymentConfirmation{}
+	err := s.db.QueryRow(query, groupID, fromUserID, toUserID, amount, slipURL).Scan(
+		&pc.ID,
+		&pc.GroupID,
+		&pc.FromUserID,
+		&pc.ToUserID,
+		&pc.Amount,
+		&pc.SlipURL,
+		&confirmedBy,
+		&confirmedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment confirmation: %v", err)
+	}
+
+	// Handle nullable fields
+	if confirmedBy.Valid {
+		pc.ConfirmedBy = &confirmedBy.Int64
+	}
+	if confirmedAt.Valid {
+		pc.ConfirmedAt = &confirmedAt.Time
+	}
+
+	return pc, nil
+}
+
+func (s *ExpenseService) GetPaymentConfirmations(groupID int) ([]models.PaymentConfirmation, error) {
+	query := `
+		SELECT pc.id, pc.group_id, pc.from_user_id, pc.to_user_id, pc.amount, pc.slip_url, pc.confirmed_by, pc.confirmed_at,
+		       u1.name as from_name, u2.name as to_name, u3.name as confirmed_by_name
+		FROM payment_confirmations pc
+		JOIN users u1 ON pc.from_user_id = u1.id
+		JOIN users u2 ON pc.to_user_id = u2.id
+		LEFT JOIN users u3 ON pc.confirmed_by = u3.id
+		WHERE pc.group_id = $1
+		ORDER BY pc.confirmed_at DESC
+	`
+
+	rows, err := s.db.Query(query, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var confirmations []models.PaymentConfirmation
+	for rows.Next() {
+		var pc models.PaymentConfirmation
+		var fromName, toName string
+		var confirmedByName sql.NullString
+		var confirmedBy sql.NullInt64
+		var confirmedAt sql.NullTime
+
+		err := rows.Scan(
+			&pc.ID, &pc.GroupID, &pc.FromUserID, &pc.ToUserID, &pc.Amount, &pc.SlipURL,
+			&confirmedBy, &confirmedAt, &fromName, &toName, &confirmedByName,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Handle nullable fields
+		if confirmedBy.Valid {
+			pc.ConfirmedBy = &confirmedBy.Int64
+		}
+		if confirmedAt.Valid {
+			pc.ConfirmedAt = &confirmedAt.Time
+		}
+
+		// Add names to the struct
+		pc.FromUserName = fromName
+		pc.ToUserName = toName
+		if confirmedByName.Valid {
+			pc.ConfirmedByName = confirmedByName.String
+		}
+
+		confirmations = append(confirmations, pc)
+	}
+
+	return confirmations, nil
+}
+
+func (s *ExpenseService) ConfirmPayment(confirmationID, confirmedBy int) error {
+	query := `
+		UPDATE payment_confirmations
+		SET confirmed_by = $1, confirmed_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND confirmed_by IS NULL
+	`
+
+	result, err := s.db.Exec(query, confirmedBy, confirmationID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("payment confirmation not found or already confirmed")
+	}
+
+	return nil
 }
 
 // optimizeSettlements calculates minimum transactions needed to settle all debts

@@ -45,17 +45,33 @@ type Split struct {
 }
 
 type Settlement struct {
-	From     int     `json:"from_user_id"`
-	FromName string  `json:"from_user_name"`
-	To       int     `json:"to_user_id"`
-	ToName   string  `json:"to_user_name"`
-	Amount   float64 `json:"amount"`
+	From        int        `json:"from_user_id"`
+	FromName    string     `json:"from_user_name"`
+	To          int        `json:"to_user_id"`
+	ToName      string     `json:"to_user_name"`
+	Amount      float64    `json:"amount"`
+	Confirmed   bool       `json:"confirmed"`
+	ConfirmedAt *time.Time `json:"confirmed_at,omitempty"`
 }
 
 type Balance struct {
 	UserID   int     `json:"user_id"`
 	UserName string  `json:"user_name"`
 	Balance  float64 `json:"balance"`
+}
+
+type PaymentConfirmation struct {
+	ID              int        `json:"id"`
+	GroupID         int        `json:"group_id"`
+	FromUserID      int        `json:"from_user_id"`
+	FromUserName    string     `json:"from_user_name,omitempty"`
+	ToUserID        int        `json:"to_user_id"`
+	ToUserName      string     `json:"to_user_name,omitempty"`
+	Amount          float64    `json:"amount"`
+	SlipURL         string     `json:"slip_url,omitempty"`
+	ConfirmedBy     *int64     `json:"confirmed_by,omitempty"`
+	ConfirmedByName string     `json:"confirmed_by_name,omitempty"`
+	ConfirmedAt     *time.Time `json:"confirmed_at,omitempty"`
 }
 
 // Request/Response DTOs

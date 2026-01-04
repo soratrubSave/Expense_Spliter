@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { api, type Group, type Expense, type User, type Balance, type Settlement } from "@/lib/api"
+import { api, type Group, type Expense, type User, type Balance, type Settlement, type PaymentConfirmation } from "@/lib/api"
 
 import { toast } from "sonner" 
 import { ArrowLeft, Plus, Receipt, TrendingUp, TrendingDown, Edit, Trash2, MoreVertical, Search } from "lucide-react"
@@ -46,6 +46,7 @@ export default function GroupDetailPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [balances, setBalances] = useState<Balance[]>([])
   const [settlements, setSettlements] = useState<Settlement[]>([])
+  const [paymentConfirmations, setPaymentConfirmations] = useState<PaymentConfirmation[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
 
@@ -73,6 +74,12 @@ export default function GroupDetailPage() {
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [searching, setSearching] = useState(false)
 
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null)
+  const [slipFile, setSlipFile] = useState<File | null>(null)
+  const [uploadingSlip, setUploadingSlip] = useState(false)
+  const [creatingPayment, setCreatingPayment] = useState(false)
+
   useEffect(() => {
     const userData = localStorage.getItem("user")
     if (userData) {
@@ -83,15 +90,17 @@ export default function GroupDetailPage() {
 
   const loadGroupData = async () => {
     try {
-      const [groupData, expensesData, settlementsData] = await Promise.all([
+      const [groupData, expensesData, settlementsData, paymentConfirmationsData] = await Promise.all([
         api.getGroup(groupId),
         api.getExpenses(groupId),
         api.getSettlements(groupId),
+        api.getPaymentConfirmations(groupId),
       ])
       setGroup(groupData)
       setExpenses(expensesData)
       setBalances(settlementsData.balances)
       setSettlements(settlementsData.settlements)
+      setPaymentConfirmations(paymentConfirmationsData || [])
     } catch (error) {
       // ✅ แก้เป็น toast.error ของ Sonner
       toast.error("Failed to load group data")
@@ -238,6 +247,50 @@ export default function GroupDetailPage() {
     } catch (error) {
       toast.error("Failed to add member")
     }
+  }
+
+  const handleCreatePaymentConfirmation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSettlement || !slipFile) return
+
+    setCreatingPayment(true)
+    try {
+      // Upload slip first
+      const uploadResult = await api.uploadSlip(slipFile)
+      
+      // Create payment confirmation
+      await api.createPaymentConfirmation(
+        groupId,
+        selectedSettlement.to_user_id,
+        selectedSettlement.amount,
+        uploadResult.slip_url,
+      )
+
+      toast.success("Payment confirmation created successfully")
+      setPaymentDialogOpen(false)
+      setSelectedSettlement(null)
+      setSlipFile(null)
+      loadGroupData()
+    } catch (error) {
+      toast.error("Failed to create payment confirmation")
+    } finally {
+      setCreatingPayment(false)
+    }
+  }
+
+  const handleConfirmPayment = async (confirmationId: number) => {
+    try {
+      await api.confirmPayment(confirmationId)
+      toast.success("Payment confirmed successfully")
+      loadGroupData()
+    } catch (error) {
+      toast.error("Failed to confirm payment")
+    }
+  }
+
+  const openPaymentDialog = (settlement: Settlement) => {
+    setSelectedSettlement(settlement)
+    setPaymentDialogOpen(true)
   }
 
   const toggleEditSplitMember = (userId: number) => {
@@ -430,8 +483,13 @@ export default function GroupDetailPage() {
                         <p className="text-sm text-muted-foreground">owes {settlement.to_user_name}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-3">
                       <p className="text-lg font-bold text-destructive">${settlement.amount.toFixed(2)}</p>
+                      {settlement.from_user_id === currentUser?.id && (
+                        <Button size="sm" onClick={() => openPaymentDialog(settlement)}>
+                          Pay
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -468,6 +526,55 @@ export default function GroupDetailPage() {
                       >
                         ${Math.abs(balance.balance).toFixed(2)}
                       </span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Payment Confirmations Section */}
+          {paymentConfirmations?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Confirmations</CardTitle>
+                <CardDescription>Pending payment confirmations</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {paymentConfirmations.map((confirmation) => (
+                  <div key={confirmation.id} className="flex items-center justify-between p-4 rounded-lg bg-muted">
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarFallback>{confirmation.from_user_name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{confirmation.from_user_name} → {confirmation.to_user_name}</p>
+                        <p className="text-sm text-muted-foreground">${confirmation.amount.toFixed(2)}</p>
+                        {confirmation.slip_url && (
+                          <a
+                            href={confirmation.slip_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-500 hover:underline"
+                          >
+                            View Slip
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {confirmation.confirmed_by ? (
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-green-600">Confirmed</p>
+                          <p className="text-xs text-muted-foreground">by {confirmation.confirmed_by_name}</p>
+                        </div>
+                      ) : confirmation.to_user_id === currentUser?.id ? (
+                        <Button size="sm" onClick={() => handleConfirmPayment(confirmation.id)}>
+                          Confirm
+                        </Button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Pending</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -752,6 +859,33 @@ export default function GroupDetailPage() {
                 )}
                 <Button type="submit" className="w-full" disabled={updatingExpense || editExpenseSplitWith.length === 0}>
                   {updatingExpense ? "Updating..." : "Update Expense"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Payment Dialog */}
+          <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Upload Payment Slip</DialogTitle>
+                <DialogDescription>
+                  Upload a slip for your payment of ${selectedSettlement?.amount.toFixed(2)} to {selectedSettlement?.to_user_name}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreatePaymentConfirmation} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slip">Payment Slip</Label>
+                  <Input
+                    id="slip"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setSlipFile(e.target.files?.[0] || null)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={creatingPayment || !slipFile}>
+                  {creatingPayment ? "Creating..." : "Upload & Submit"}
                 </Button>
               </form>
             </DialogContent>

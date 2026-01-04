@@ -121,6 +121,13 @@ func main() {
 	settlements := api.Group("/settlements")
 	settlements.Get("/group/:groupId", expenseHandler.GetSettlements)
 
+	// Payment confirmation routes
+	payments := api.Group("/payments")
+	payments.Post("/upload-slip", expenseHandler.UploadSlip)
+	payments.Post("/confirmations", expenseHandler.CreatePaymentConfirmation)
+	payments.Get("/confirmations/group/:groupId", expenseHandler.GetPaymentConfirmations)
+	payments.Put("/confirmations/:id/confirm", expenseHandler.ConfirmPayment)
+
 	// Start server
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {

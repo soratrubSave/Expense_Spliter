@@ -59,6 +59,20 @@ export interface SettlementResponse {
   balances: Balance[]
 }
 
+export interface PaymentConfirmation {
+  id: number
+  group_id: number
+  from_user_id: number
+  from_user_name: string
+  to_user_id: number
+  to_user_name: string
+  amount: number
+  slip_url?: string
+  confirmed_by?: number
+  confirmed_by_name?: string
+  confirmed_at?: string
+}
+
 class ApiClient {
   private getAuthHeaders() {
     const token = localStorage.getItem("token")
@@ -222,6 +236,57 @@ class ApiClient {
     })
     if (!response.ok) throw new Error("Failed to fetch settlements")
     return response.json()
+  }
+
+  async uploadSlip(file: File): Promise<{ slip_url: string }> {
+    const formData = new FormData()
+    formData.append("slip", file)
+
+    const response = await fetch(`${API_BASE_URL}/payments/upload-slip`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: formData,
+    })
+    if (!response.ok) throw new Error("Failed to upload slip")
+    return response.json()
+  }
+
+  async createPaymentConfirmation(
+    groupId: number,
+    toUserId: number,
+    amount: number,
+    slipUrl: string,
+  ): Promise<PaymentConfirmation> {
+    const response = await fetch(`${API_BASE_URL}/payments/confirmations`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        group_id: groupId,
+        to_user_id: toUserId,
+        amount,
+        slip_url: slipUrl,
+      }),
+    })
+    if (!response.ok) throw new Error("Failed to create payment confirmation")
+    return response.json()
+  }
+
+  async getPaymentConfirmations(groupId: number): Promise<PaymentConfirmation[]> {
+    const response = await fetch(`${API_BASE_URL}/payments/confirmations/group/${groupId}`, {
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to fetch payment confirmations")
+    return response.json()
+  }
+
+  async confirmPayment(confirmationId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/payments/confirmations/${confirmationId}/confirm`, {
+      method: "PUT",
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to confirm payment")
   }
 }
 

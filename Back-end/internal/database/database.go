@@ -73,6 +73,17 @@ func RunMigrations(db *sql.DB) error {
 			user_id INTEGER REFERENCES users(id),
 			amount DECIMAL(10, 2) NOT NULL
 		)`,
+
+		`CREATE TABLE IF NOT EXISTS payment_confirmations (
+			id SERIAL PRIMARY KEY,
+			group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+			from_user_id INTEGER REFERENCES users(id),
+			to_user_id INTEGER REFERENCES users(id),
+			amount DECIMAL(10, 2) NOT NULL,
+			slip_url VARCHAR(500),
+			confirmed_by INTEGER REFERENCES users(id),
+			confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
 	}
 
 	for _, migration := range migrations {
