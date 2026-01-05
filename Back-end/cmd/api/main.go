@@ -98,7 +98,6 @@ func main() {
 	// Protected routes
 	api.Use(handlers.AuthMiddleware)
 
-	// Group routes
 	groups := api.Group("/groups")
 	groups.Post("/", groupHandler.CreateGroup)
 	groups.Get("/", groupHandler.GetUserGroups)

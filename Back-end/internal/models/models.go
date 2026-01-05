@@ -107,3 +107,10 @@ type CreateExpenseRequest struct {
 	PaidBy      int     `json:"paid_by"`
 	SplitWith   []int   `json:"split_with"` // User IDs to split with
 }
+
+type CreatePaymentConfirmationRequest struct {
+	GroupID  int     `json:"group_id"`
+	ToUserID int     `json:"to_user_id"`
+	Amount   float64 `json:"amount"`
+	SlipURL  string  `json:"slip_url"`
+}

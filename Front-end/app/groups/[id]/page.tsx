@@ -266,7 +266,7 @@ export default function GroupDetailPage() {
         uploadResult.slip_url,
       )
 
-      toast.success("Payment confirmation created successfully")
+      toast.success("Payment slip submitted successfully")
       setPaymentDialogOpen(false)
       setSelectedSettlement(null)
       setSlipFile(null)

@@ -22,8 +22,6 @@ func NewExpenseHandler(expenseService *services.ExpenseService) *ExpenseHandler 
 }
 
 func (h *ExpenseHandler) CreateExpense(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(int)
-
 	var req models.CreateExpenseRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -40,7 +38,7 @@ func (h *ExpenseHandler) CreateExpense(c *fiber.Ctx) error {
 	// Check if user is member of the group
 	isMember := false
 	for _, id := range req.SplitWith {
-		if id == userID {
+		if id == req.PaidBy {
 			isMember = true
 			break
 		}
@@ -235,13 +233,7 @@ func (h *ExpenseHandler) UploadSlip(c *fiber.Ctx) error {
 func (h *ExpenseHandler) CreatePaymentConfirmation(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(int)
 
-	var req struct {
-		GroupID  int     `json:"group_id"`
-		ToUserID int     `json:"to_user_id"`
-		Amount   float64 `json:"amount"`
-		SlipURL  string  `json:"slip_url"`
-	}
-
+	var req models.CreatePaymentConfirmationRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
