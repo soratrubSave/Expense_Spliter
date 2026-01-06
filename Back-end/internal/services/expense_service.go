@@ -278,9 +278,6 @@ func (s *ExpenseService) CalculateSettlements(groupID int) ([]models.Settlement,
 			return nil, nil, err
 		}
 
-		// When payment is confirmed: from_user pays to_user
-		// So from_user's balance decreases (less negative or more positive)
-		// to_user's balance increases (less positive or more negative)
 		balanceMap[fromUserID] += amount // from_user paid, so their debt decreases
 		balanceMap[toUserID] -= amount   // to_user received, so their credit decreases
 	}
