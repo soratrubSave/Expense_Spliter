@@ -1,0 +1,38 @@
+name: Frontend CI (Build Check)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Front-end/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'Front-end/**'
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Front-end
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: Front-end/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    # Next.js มีตัว Lint มาให้ ช่วยเช็คพวกตัวแปรที่ไม่ได้ใช้ หรือ Error พื้นฐานให้
+    - name: Lint Check
+      run: npm run lint
+
+    - name: Try Build
+      run: npm run build

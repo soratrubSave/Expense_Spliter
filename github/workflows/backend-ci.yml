@@ -1,0 +1,33 @@
+name: Backend CI (Build Check)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Back-end/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'Back-end/**'
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Back-end
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25.0' 
+
+    - name: Download dependencies
+      run: go mod download
+
+    
+    - name: Try Build
+      run: go build -v ./cmd/api/main.go
