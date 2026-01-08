@@ -195,7 +195,7 @@ export default function DashboardPage() {
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">No groups yet</h3>
                 <p className="text-slate-500 max-w-sm mx-auto mb-8">
-                  Looks like you haven't joined any expense groups. Create one to start splitting bills with your friends!
+                  Looks like you haven&apos;t joined any expense groups. Create one to start splitting bills with your friends!
                 </p>
                 <Button 
                   onClick={() => setDialogOpen(true)} 
