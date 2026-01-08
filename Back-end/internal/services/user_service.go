@@ -2,9 +2,14 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"expense-splitter/internal/models"
 	"fmt"
+
+	"github.com/lib/pq"
 )
+
+var ErrEmailAlreadyExists = errors.New("email already exists")
 
 type UserService struct {
 	db *sql.DB
@@ -30,6 +35,10 @@ func (s *UserService) CreateUser(email, name, hashedPassword string) (*models.Us
 	)
 
 	if err != nil {
+
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+			return nil, ErrEmailAlreadyExists
+		}
 		return nil, fmt.Errorf("failed to create user: %v", err)
 	}
 

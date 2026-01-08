@@ -34,7 +34,7 @@ export default function LoginPage() {
       router.push("/")
     } catch (error) {
       toast.error("Login failed", {
-        description: "Please check your credentials and try again.",
+        description: error instanceof Error ? error.message : "Invalid email or password",
       })
     } finally {
       setLoading(false)

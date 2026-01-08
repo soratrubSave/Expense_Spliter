@@ -82,14 +82,22 @@ class ApiClient {
     }
   }
 
+  private async handleResponse<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+      // พยายามอ่าน Error Message ที่ Backend ส่งมา (เช่น { "error": "This email is already..." })
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "An error occurred");
+    }
+    return response.json();
+  }
+
   async register(email: string, name: string, password: string): Promise<AuthResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name, password }),
     })
-    if (!response.ok) throw new Error("Registration failed")
-    return response.json()
+    return this.handleResponse<AuthResponse>(response);
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
@@ -98,8 +106,7 @@ class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     })
-    if (!response.ok) throw new Error("Login failed")
-    return response.json()
+    return this.handleResponse<AuthResponse>(response);
   }
 
   async getGroups(): Promise<Group[]> {

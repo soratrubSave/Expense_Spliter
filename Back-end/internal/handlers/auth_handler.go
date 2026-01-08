@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"expense-splitter/internal/models"
 	"expense-splitter/internal/services"
 	"expense-splitter/pkg/utils"
@@ -47,8 +48,16 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Create user
 	user, err := h.userService.CreateUser(req.Email, req.Name, hashedPassword)
 	if err != nil {
+		// ถ้าเป็นเคส Email ซ้ำ ให้ส่ง Error 409 Conflict พร้อมข้อความชัดเจน
+		if errors.Is(err, services.ErrEmailAlreadyExists) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "This email is already currently used",
+			})
+		}
+
+		// Error อื่นๆ ส่ง 500
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "Failed to create account",
 		})
 	}
 

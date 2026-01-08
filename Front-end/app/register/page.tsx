@@ -35,7 +35,7 @@ export default function RegisterPage() {
       router.push("/")
     } catch (error) {
       toast.error("Registration failed", {
-        description: "Please check your inputs and try again.",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
       })
     } finally {
       setLoading(false)
