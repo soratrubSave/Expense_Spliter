@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AuthGuard } from "@/components/auth-guard"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,6 @@ export default function FriendsPage() {
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [searching, setSearching] = useState(false)
   const [addFriendDialogOpen, setAddFriendDialogOpen] = useState(false)
-  const [addFriendEmail, setAddFriendEmail] = useState("")
 
   useEffect(() => {
     loadFriends()
@@ -50,7 +49,7 @@ export default function FriendsPage() {
     try {
       const data = await api.getFriends()
       setFriends(data)
-    } catch (error) {
+    } catch {
       toast.error("Failed to load friends")
     } finally {
       setLoading(false)
@@ -78,7 +77,7 @@ export default function FriendsPage() {
         const friendIds = new Set(friends.map(f => f.id))
         setSearchResults(results.filter((u: User) => !friendIds.has(u.id)))
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to search users")
       setSearchResults([])
     } finally {
@@ -93,8 +92,10 @@ export default function FriendsPage() {
       setSearchQuery("")
       setSearchResults([])
       loadFriends()
-    } catch (error: any) {
-      toast.error(error.message || "Failed to add friend")
+    } catch (error) {
+      // Fix: Handle error type safely without using 'any'
+      const message = error instanceof Error ? error.message : "Failed to add friend"
+      toast.error(message)
     }
   }
 
@@ -103,7 +104,7 @@ export default function FriendsPage() {
       await api.removeFriend(friendId)
       toast.success("Friend removed successfully")
       loadFriends()
-    } catch (error) {
+    } catch {
       toast.error("Failed to remove friend")
     }
   }
