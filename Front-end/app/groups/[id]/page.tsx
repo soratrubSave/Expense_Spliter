@@ -89,6 +89,16 @@ export default function GroupDetailPage() {
     loadGroupData()
   }, [groupId])
 
+  // Polling เพื่อดึงข้อมูลล่าสุดอัตโนมัติ (ลดความจำเป็นต้องรีเฟรช)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadGroupData()
+      }
+    }, 3000) // ปรับช่วงเวลาได้ตามต้องการ
+    return () => clearInterval(id)
+  }, [groupId])
+
   const loadGroupData = async () => {
     try {
       const [groupData, expensesData, settlementsData, paymentConfirmationsData] = await Promise.all([
@@ -113,6 +123,30 @@ export default function GroupDetailPage() {
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
+    const tempId = Date.now()
+    const paidById = Number(expensePaidBy || currentUser?.id || 0)
+    const perAmount = expenseSplitWith.length > 0 ? Number(expenseAmount || 0) / expenseSplitWith.length : 0
+    const tempExpense: Expense = {
+      id: tempId,
+      group_id: groupId,
+      description: expenseDescription,
+      amount: Number(expenseAmount || 0),
+      paid_by: paidById,
+      paid_by_name:
+        group?.members?.find((m) => m.id === paidById)?.name ||
+        currentUser?.name ||
+        "You",
+      created_at: new Date().toISOString(),
+      splits: expenseSplitWith.map((uid, idx) => ({
+        id: tempId + idx + 1,
+        expense_id: tempId,
+        user_id: uid,
+        user_name: group?.members?.find((m) => m.id === uid)?.name || "",
+        amount: Number(perAmount.toFixed(2)),
+      })),
+    }
+    // Optimistic update: แสดงรายการทันที
+    setExpenses((prev) => [...prev, tempExpense])
     try {
       await api.createExpense(groupId, expenseDescription, Number(expenseAmount), Number(expensePaidBy), expenseSplitWith)
       toast.success("Expense added successfully")
@@ -121,8 +155,10 @@ export default function GroupDetailPage() {
       setExpenseAmount("")
       setExpensePaidBy("")
       setExpenseSplitWith([])
-      loadGroupData()
+      loadGroupData() // sync ข้อมูลจริงกลับมา
     } catch (error) {
+      // rollback ถ้าไม่สำเร็จ
+      setExpenses((prev) => prev.filter((ex) => ex.id !== tempId))
       toast.error("Failed to create expense")
     } finally {
       setCreating(false)
