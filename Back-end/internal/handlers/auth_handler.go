@@ -167,3 +167,17 @@ func AuthMiddleware(c *fiber.Ctx) error {
 
 	return c.Next()
 }
+
+func (h *AuthHandler) SearchUsers(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(int)
+	query := c.Query("q")
+
+	users, err := h.userService.SearchAllUsers(query, userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(users)
+}

@@ -94,6 +94,14 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/friends")}
+                className="hidden md:flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <Users className="h-4 w-4" />
+                Friends
+              </Button>
               <div className="hidden md:block text-right">
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                   {user?.name}

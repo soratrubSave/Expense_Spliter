@@ -124,19 +124,54 @@ func (s *UserService) SearchUsers(query string, currentUserID int, excludeGroupI
 		return []models.User{}, nil
 	}
 
-	// Search by email or name, exclude current user and users already in the group
+	// Search only friends by email or name, exclude current user and users already in the group
 	searchQuery := `
 		SELECT DISTINCT u.id, u.email, u.name, u.created_at
 		FROM users u
-		WHERE (u.email ILIKE $1 OR u.name ILIKE $1)
-		AND u.id != $2
+		JOIN friendships f ON u.id = f.friend_id
+		WHERE f.user_id = $1
+		AND (u.email ILIKE $2 OR u.name ILIKE $2)
+		AND u.id != $1
 		AND u.id NOT IN (
 			SELECT user_id FROM group_members WHERE group_id = $3
 		)
 		LIMIT 10
 	`
 
-	rows, err := s.db.Query(searchQuery, "%"+query+"%", currentUserID, excludeGroupID)
+	rows, err := s.db.Query(searchQuery, currentUserID, "%"+query+"%", excludeGroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []models.User{}
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func (s *UserService) SearchAllUsers(query string, currentUserID int) ([]models.User, error) {
+	if query == "" {
+		return []models.User{}, nil
+	}
+
+	// Search all users by email or name, exclude current user
+	searchQuery := `
+		SELECT DISTINCT u.id, u.email, u.name, u.created_at
+		FROM users u
+		WHERE (u.email ILIKE $1 OR u.name ILIKE $1)
+		AND u.id != $2
+		ORDER BY u.name
+		LIMIT 20
+	`
+
+	rows, err := s.db.Query(searchQuery, "%"+query+"%", currentUserID)
 	if err != nil {
 		return nil, err
 	}

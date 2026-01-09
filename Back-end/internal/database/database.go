@@ -84,6 +84,15 @@ func RunMigrations(db *sql.DB) error {
 			confirmed_by INTEGER REFERENCES users(id),
 			confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+
+		`CREATE TABLE IF NOT EXISTS friendships (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			friend_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(user_id, friend_id),
+			CHECK(user_id != friend_id)
+		)`,
 	}
 
 	for _, migration := range migrations {

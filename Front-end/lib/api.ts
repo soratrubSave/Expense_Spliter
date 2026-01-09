@@ -295,6 +295,42 @@ class ApiClient {
     })
     if (!response.ok) throw new Error("Failed to confirm payment")
   }
+
+  async getFriends(): Promise<User[]> {
+    const response = await fetch(`${API_BASE_URL}/friends`, {
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to fetch friends")
+    return response.json()
+  }
+
+  async addFriend(friendId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/friends`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ friend_id: friendId }),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || "Failed to add friend")
+    }
+  }
+
+  async removeFriend(friendId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/friends/${friendId}`, {
+      method: "DELETE",
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to remove friend")
+  }
+
+  async searchFriends(query: string): Promise<User[]> {
+    const response = await fetch(`${API_BASE_URL}/friends/search?q=${encodeURIComponent(query)}`, {
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error("Failed to search friends")
+    return response.json()
+  }
 }
 
 export const api = new ApiClient()

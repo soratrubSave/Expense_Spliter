@@ -64,11 +64,13 @@ func main() {
 	userService := services.NewUserService(db)
 	groupService := services.NewGroupService(db)
 	expenseService := services.NewExpenseService(db)
+	friendService := services.NewFriendService(db)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userService)
 	groupHandler := handlers.NewGroupHandler(groupService, userService)
 	expenseHandler := handlers.NewExpenseHandler(expenseService)
+	friendHandler := handlers.NewFriendHandler(friendService, userService)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -126,6 +128,17 @@ func main() {
 	payments.Post("/confirmations", expenseHandler.CreatePaymentConfirmation)
 	payments.Get("/confirmations/group/:groupId", expenseHandler.GetPaymentConfirmations)
 	payments.Put("/confirmations/:id/confirm", expenseHandler.ConfirmPayment)
+
+	// Friend routes
+	friends := api.Group("/friends")
+	friends.Post("/", friendHandler.AddFriend)
+	friends.Get("/", friendHandler.GetFriends)
+	friends.Get("/search", friendHandler.SearchFriends)
+	friends.Delete("/:id", friendHandler.RemoveFriend)
+
+	// User routes
+	users := api.Group("/users")
+	users.Get("/search", authHandler.SearchUsers)
 
 	// Start server
 	port := os.Getenv("SERVER_PORT")

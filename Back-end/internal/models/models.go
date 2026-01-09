@@ -114,3 +114,15 @@ type CreatePaymentConfirmationRequest struct {
 	Amount   float64 `json:"amount"`
 	SlipURL  string  `json:"slip_url"`
 }
+
+type Friendship struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	FriendID  int       `json:"friend_id"`
+	CreatedAt time.Time `json:"created_at"`
+	Friend    User      `json:"friend,omitempty"`
+}
+
+type AddFriendRequest struct {
+	FriendID int `json:"friend_id"`
+}
